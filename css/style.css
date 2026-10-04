@@ -108,7 +108,7 @@ canvas{width:100%;height:auto;display:block;max-height:46vh;object-fit:contain;b
 .fb-body{font-size:17px;line-height:1.4}
 .fb-body .ans{display:block;margin-top:10px;padding:10px 12px;background:#06d6a022;border-left:4px solid var(--accent2);border-radius:8px}
 .fb-source{margin:14px 0;padding:10px 14px;border-left:4px solid var(--accent);background:#0e1430;color:var(--muted);font-size:14px;line-height:1.4;font-style:italic;border-radius:8px}
-.fb-source::before{content:'Fra boken: ';font-style:normal;font-weight:800;color:var(--accent)}
+.fb-source::before{content:'Husk: ';font-style:normal;font-weight:800;color:var(--accent)}
 #fb-next{width:100%;font-size:18px;margin-top:4px}
 
 /* Overlay (level intro / resultat) */

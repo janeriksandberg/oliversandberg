@@ -16,7 +16,7 @@ const Vault = (() => {
   async function unlock(password, blob) {
     if (!blob || !blob.ct) throw new Error('Mangler data');
     if (!crypto.subtle) throw new Error('Nettleseren mangler Web Crypto (krever https eller localhost).');
-    const key = await deriveKey(password, b64(blob.salt), blob.iterations || 200000);
+    const key = await deriveKey(password, b64(blob.salt), blob.iterations || 600000);
     try {
       const plain = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: b64(blob.iv) }, key, b64(blob.ct));
       return JSON.parse(dec.decode(plain));
