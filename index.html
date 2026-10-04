@@ -1,0 +1,167 @@
+<!doctype html>
+<html lang="nb">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Paragrafagenten – forvaltningsrett</title>
+<meta name="robots" content="noindex">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>§</text></svg>">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<canvas id="game"></canvas>
+
+<!-- Innlogging -->
+<section id="login" class="screen center">
+  <div class="card login-card">
+    <div class="logo">§</div>
+    <h1>Paragrafagenten</h1>
+    <p class="sub">Pugg forvaltningsrett. Skyt byråkratiet. Bli eksamensklar.</p>
+    <form id="loginForm" autocomplete="off">
+      <label for="pw">Passord</label>
+      <input id="pw" type="password" autocomplete="current-password" required>
+      <label class="check"><input id="remember" type="checkbox" checked> Husk meg på denne enheten</label>
+      <button class="btn big" type="submit">Lås opp</button>
+      <p id="loginMsg" class="msg" role="alert"></p>
+    </form>
+  </div>
+</section>
+
+<!-- Meny / kart -->
+<section id="menu" class="screen hidden">
+  <header class="menu-head">
+    <div>
+      <h1 class="title">§ Paragrafagenten</h1>
+      <div id="rank" class="rank"></div>
+    </div>
+    <div class="stats">
+      <span class="pill" title="Stjerner">⭐ <b id="mStars">0</b></span>
+      <span class="pill" title="Erfaring">⚡ <b id="mXp">0</b> XP</span>
+      <span class="pill" title="Mynter">🪙 <b id="mCoins">0</b></span>
+    </div>
+  </header>
+  <div class="xpbar"><div id="xpFill"></div><span id="xpText"></span></div>
+  <div class="quick">
+    <button id="btnContinue" class="btn big">▶ Fortsett</button>
+    <button id="btnMixed" class="btn alt">🎲 Eksamenstrening (blandet)</button>
+    <button id="btnWrong" class="btn alt">🧠 Feilbanken</button>
+  </div>
+  <div class="settings">
+    <label class="check"><input type="checkbox" id="setSound" checked> Lydeffekter</label>
+    <label class="check"><input type="checkbox" id="setMusic"> Musikk</label>
+    <label class="check"><input type="checkbox" id="setCalm"> Rolig modus (ingen tidsfrist)</label>
+    <label class="check"><input type="checkbox" id="setMotion"> Mindre risting og blink</label>
+  </div>
+  <div id="worlds"></div>
+  <footer class="foot">Alle spørsmål bygger på Eckhoff: <i>Forvaltningsrett</i> (råmanus). Hvert nivå er ett kapittel i boken. <button id="btnHelp" class="link">Slik spiller du</button> · <button id="btnLogout" class="link">Logg ut</button></footer>
+</section>
+
+<!-- Nivåintro -->
+<section id="intro" class="screen center hidden">
+  <div class="card intro-card">
+    <div id="introWorld" class="eyebrow"></div>
+    <h2 id="introTitle"></h2>
+    <div class="tip"><b>💡 Eksamenstips</b><p id="introSummary"></p></div>
+    <div id="introWeapon" class="weapon-line"></div>
+    <ul class="howto">
+      <li>Styr agenten med <kbd>↑</kbd><kbd>↓</kbd> eller mus/finger. Våpenet skyter selv.</li>
+      <li>Svar med <kbd>1</kbd>–<kbd>4</kbd> eller trykk på svaret. Riktig svar gir sterkere våpen.</li>
+      <li>Feil svar koster et hjerte, og spørsmålet kommer tilbake på slutten.</li>
+    </ul>
+    <div class="row">
+      <button id="introBack" class="btn alt">Tilbake</button>
+      <button id="introStart" class="btn big">Start <kbd>Mellomrom</kbd></button>
+    </div>
+  </div>
+</section>
+
+<!-- HUD -->
+<div id="hud" class="hidden">
+  <div class="hud-left">
+    <div id="hearts" class="hearts"></div>
+    <div id="weaponName" class="weapon-name"></div>
+  </div>
+  <div class="hud-mid">
+    <div class="road"><div id="roadFill"></div><div id="roadHero">🦸</div><div class="road-goal">🏁</div></div>
+    <div id="hudLabel" class="hud-label"></div>
+  </div>
+  <div class="hud-right">
+    <div id="combo" class="combo"></div>
+    <div class="score">⚡ <b id="score">0</b></div>
+    <button id="btnBomb" class="bomb" title="Ugyldighetsbombe (X)"><span>💣</span><i id="bombFill"></i></button>
+    <button id="btnPause" class="iconbtn" title="Pause (P)">⏸</button>
+  </div>
+</div>
+
+<!-- Spørsmålspanel -->
+<div id="qpanel" class="hidden">
+  <div class="qhead"><span id="qMeta"></span><span id="qTimerWrap"><span id="qTimer"></span></span></div>
+  <div id="qText" class="qtext"></div>
+  <div id="qOptions" class="qopts"></div>
+</div>
+
+<!-- Tilbakemelding -->
+<div id="feedback" class="hidden">
+  <div class="fb-card">
+    <div id="fbHead" class="fb-head"></div>
+    <div id="fbAnswer" class="fb-answer"></div>
+    <p id="fbExplain" class="fb-explain"></p>
+    <blockquote id="fbSource" class="fb-source"></blockquote>
+    <button id="fbNext" class="btn big">Videre <kbd>Mellomrom</kbd></button>
+    <div id="fbAuto" class="fb-auto"><i></i></div>
+  </div>
+</div>
+
+<!-- Banner -->
+<div id="banner" class="hidden"></div>
+
+<!-- Pause -->
+<section id="pause" class="screen center hidden">
+  <div class="card">
+    <h2>Pause</h2>
+    <p>Pust ut. Du klarer dette.</p>
+    <div class="row">
+      <button id="pauseQuit" class="btn alt">Avslutt nivå</button>
+      <button id="pauseResume" class="btn big">Fortsett <kbd>P</kbd></button>
+    </div>
+  </div>
+</section>
+
+<!-- Resultat -->
+<section id="result" class="screen center hidden">
+  <div class="card result-card">
+    <h2 id="resTitle"></h2>
+    <div id="resStars" class="res-stars"></div>
+    <div id="resStats" class="res-stats"></div>
+    <div id="resUnlock" class="res-unlock"></div>
+    <details id="resReviewWrap"><summary>Se gjennom det du bommet på</summary><div id="resReview"></div></details>
+    <div class="row">
+      <button id="resMenu" class="btn alt">Til kartet</button>
+      <button id="resRetry" class="btn alt">Prøv igjen</button>
+      <button id="resNext" class="btn big">Neste nivå ▶</button>
+    </div>
+  </div>
+</section>
+
+<!-- Hjelp -->
+<section id="help" class="screen center hidden">
+  <div class="card">
+    <h2>Slik spiller du</h2>
+    <ul class="howto">
+      <li><b>Mål:</b> Kom deg gjennom alle 33 kapitler og samle stjerner. Hvert nivå er ett kapittel i boken.</li>
+      <li><b>Bølger:</b> Mellom spørsmålene kommer det byråkrati-monstre. Våpenet skyter selv, du styrer med <kbd>↑</kbd><kbd>↓</kbd>/<kbd>W</kbd><kbd>S</kbd> eller mus/finger.</li>
+      <li><b>Spørsmål:</b> Fire svar-monstre kommer mot deg. Skyt det riktige ved å trykke <kbd>1</kbd>–<kbd>4</kbd> eller på svaret.</li>
+      <li><b>Våpen:</b> Hver del av boken gir et nytt grunnvåpen. Svarer du riktig flere ganger på rad, får våpenet flere løp og skyter raskere.</li>
+      <li><b>Bombe:</b> Hvert riktige svar lader Ugyldighetsbomben. Full? Trykk <kbd>X</kbd> for å rydde skjermen.</li>
+      <li><b>Læring:</b> Feil svar viser riktig svar og sitatet fra boken. Spørsmålet kommer igjen på slutten av nivået og havner i Feilbanken til du kan det.</li>
+      <li><b>Stjerner:</b> 3 stjerner krever minst 90 % riktig på første forsøk.</li>
+    </ul>
+    <button id="helpClose" class="btn big">Skjønner!</button>
+  </div>
+</section>
+
+<script src="js/audio.js"></script>
+<script src="js/crypto.js"></script>
+<script src="js/game.js"></script>
+</body>
+</html>
