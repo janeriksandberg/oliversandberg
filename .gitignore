@@ -1,0 +1,3 @@
+# Spørsmålene i klartekst holdes utenfor det offentlige repoet. Bare den krypterte fila publiseres.
+content/questions/
+node_modules/
