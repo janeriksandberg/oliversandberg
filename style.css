@@ -147,3 +147,21 @@ summary{cursor:pointer;font-weight:700}
 
 @media (prefers-reduced-motion:reduce){*{animation-duration:.01ms!important;transition-duration:.01ms!important}}
 body.calm-motion *{animation-iteration-count:1!important}
+.hud-mid{min-width:0}
+@media (max-width:640px){
+  #hud{padding:8px;gap:6px}
+  .hearts{font-size:14px;letter-spacing:0;white-space:nowrap}
+  .weapon-name{font-size:.7rem;white-space:nowrap}
+  .hud-label{font-size:.7rem}
+  .hud-right{gap:4px}
+  .score{font-size:.8rem;padding:3px 6px}
+  .combo{font-size:.9rem}
+  .bomb{width:38px;height:38px}.bomb span{font-size:18px}
+  .iconbtn{width:36px;height:36px;font-size:15px}
+  #roadHero{font-size:18px;top:-10px}.road-goal{font-size:16px;top:-8px;right:-6px}
+  .road{height:10px}
+}
+@media (max-width:640px){
+  #hud{flex-wrap:wrap}
+  .hud-mid{order:3;flex-basis:100%;max-width:none;margin-top:6px}
+}

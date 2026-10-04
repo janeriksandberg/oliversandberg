@@ -22,7 +22,7 @@ const WORLDS = [
   { del: 'Del 4', title: 'Behandlingen av saker som gjelder «vedtak»', name: 'Vedtaksvulkanen', from: 15, to: 22,
     sky: ['#2b0f1f', '#a33a2c'], hill: '#5a1f26', near: '#7a2a2a', ground: '#3a1418', tint: 'rgba(255,120,60,.16)' },
   { del: 'Del 5', title: 'Rettsgrunnlag og grenser for forvaltningens virksomhet', name: 'Hjemmelsfjellet', from: 23, to: 28,
-    sky: ['#1b1030', '#6a3d9a'], hill: '#3d2463', near: '#4f2f7d', ground: '#24153b', tint: 'rgba(255,95,210,.14)' },
+    sky: ['#2a1a0a', '#b8742a'], hill: '#5c3a1a', near: '#6e4722', ground: '#3a240f', tint: 'rgba(255,95,210,.14)' },
   { del: 'Del 6', title: 'Ugyldighet, håndheving og kontroll', name: 'Domstolsborgen', from: 29, to: 33,
     sky: ['#05060f', '#1d2b5a'], hill: '#151f42', near: '#1e2b57', ground: '#0a1028', tint: 'rgba(255,209,102,.12)' },
 ];
@@ -111,7 +111,7 @@ const G = {
 };
 for (let i = 0; i < 90; i++) G.stars.push({ x: Math.random(), y: Math.random() * 0.7, z: rand(0.2, 1) });
 
-function playTop() { return 64; }
+function playTop() { return W <= 640 ? 104 : 64; }
 function playBottom() {
   const p = $('qpanel');
   if (!p.classList.contains('hidden')) return Math.max(playTop() + 160, H - p.offsetHeight - 24);
@@ -213,7 +213,7 @@ function beginQuestion() {
   r.timerMax = clamp(18 + len * 0.07, 25, 70) * (r.cur.isBoss ? 1.15 : 1);
   r.timer = r.timerMax;
   if (r.cur.isBoss) { banner(`BOSS!<small>${BOSSES[G.world]}</small>`, 1600); Sfx.boss(); shake(10); }
-  requestAnimationFrame(() => spawnAnswerEnemies());
+  spawnAnswerEnemies();
 }
 
 function laneYs() {
@@ -224,10 +224,13 @@ function laneYs() {
 function spawnAnswerEnemies() {
   const r = G.run; if (!r || r.phase !== 'question') return;
   const ys = laneYs();
+  const br = clamp(W * 0.09, 36, 70);
+  const sc = clamp((ys[1] - ys[0]) / 72, 0.55, 1);
+  const tx = r.cur.isBoss ? Math.min(W * 0.78, W - 2 * br - 90) : W * 0.78;
   for (let i = 0; i < 4; i++) {
-    G.enemies.push({ kind: 'answer', idx: i, x: W + 60 + i * 30, y: ys[i], baseY: ys[i], tx: W * 0.78, r: 26, color: OPT_COLORS[i], hp: 99, t: Math.random() * 6 });
+    G.enemies.push({ kind: 'answer', idx: i, x: W + 60 + i * 30, y: ys[i], baseY: ys[i], tx, sc, r: 26, color: OPT_COLORS[i], hp: 99, t: Math.random() * 6 });
   }
-  if (r.cur.isBoss) G.enemies.push({ kind: 'boss', x: W + 200, y: (ys[0] + ys[3]) / 2, tx: W - 90, r: 70, color: '#ff4d6d', hp: 999, t: 0 });
+  if (r.cur.isBoss) G.enemies.push({ kind: 'boss', x: W + 200, y: (ys[0] + ys[3]) / 2, tx: W - br - 50, r: br, color: '#ff4d6d', hp: 999, t: 0 });
 }
 
 function renderQuestion() {
@@ -262,6 +265,7 @@ function answer(i) {
     const target = G.enemies.find(e => e.kind === 'answer' && e.idx === i);
     setTimeout(() => {
       if (!G.run || G.run !== r) return;
+      if (!target) return resolveAnswer(i);
       G.bullets.push({ x: G.hero.x + 30, y: ys[i], vx: 1500, vy: 0, big: true, color: OPT_COLORS[i], target, dmg: 0, life: 2 });
       Sfx.shoot(r.weapon);
     }, 220);
@@ -680,6 +684,7 @@ function drawAnswer(e) {
   cx.save(); cx.translate(e.x, e.y);
   const shakeX = e.wrongHit ? rand(-6, 6) : 0;
   cx.translate(shakeX, 0);
+  cx.scale(e.sc || 1, e.sc || 1);
   if (e.glow) { cx.shadowColor = '#2ee59d'; cx.shadowBlur = 30 + Math.sin(G.t * 10) * 10; }
   // dokumentmonster
   const w = 48, h = 58;
@@ -706,7 +711,8 @@ function drawAnswer(e) {
 }
 function drawBoss(e) {
   cx.save(); cx.translate(e.x, e.y + Math.sin(e.t * 1.5) * 12);
-  const R = e.r;
+  cx.scale(e.r / 70, e.r / 70);
+  const R = 70;
   cx.fillStyle = '#3a0d1f'; cx.beginPath(); cx.arc(0, 0, R + 8, 0, 7); cx.fill();
   const g = cx.createRadialGradient(-20, -20, 10, 0, 0, R);
   g.addColorStop(0, '#ff7a90'); g.addColorStop(1, '#8a1030');
@@ -720,8 +726,10 @@ function drawBoss(e) {
   cx.fillStyle = '#111'; cx.beginPath(); cx.arc(0, 26, 22, 0, Math.PI); cx.fill();
   cx.fillStyle = '#fff'; for (let i = -2; i <= 2; i++) { cx.beginPath(); cx.moveTo(i * 8 - 4, 26); cx.lineTo(i * 8, 36); cx.lineTo(i * 8 + 4, 26); cx.fill(); }
   cx.restore();
-  cx.font = '900 16px system-ui'; cx.textAlign = 'center'; cx.fillStyle = '#ffd166'; cx.strokeStyle = '#000'; cx.lineWidth = 4;
-  cx.strokeText(BOSSES[G.world], e.x, e.y + e.r + 34); cx.fillText(BOSSES[G.world], e.x, e.y + e.r + 34);
+  cx.font = `900 ${W <= 640 ? 12 : 16}px system-ui`; cx.textAlign = 'center'; cx.fillStyle = '#ffd166'; cx.strokeStyle = '#000'; cx.lineWidth = 4;
+  const tw = cx.measureText(BOSSES[G.world]).width / 2 + 6;
+  const bx = clamp(e.x, tw, W - tw);
+  cx.strokeText(BOSSES[G.world], bx, e.y + e.r + 34); cx.fillText(BOSSES[G.world], bx, e.y + e.r + 34);
 }
 function drawBullet(b) {
   cx.save(); cx.translate(b.x, b.y);
