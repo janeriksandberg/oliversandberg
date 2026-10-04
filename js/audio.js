@@ -1,93 +1,82 @@
-// Lydeffekter laget med Web Audio (ingen lydfiler).
+/* Syntetiserte lydeffekter og en liten chiptune-loop via Web Audio. Ingen filer å laste. */
 const Sfx = (() => {
-  let ctx = null, master = null, musicGain = null, musicTimer = null;
-  const state = { sound: true, music: false };
-
-  function ensure() {
-    if (!ctx) {
-      const AC = window.AudioContext || window.webkitAudioContext;
-      if (!AC) return null;
-      ctx = new AC();
-      master = ctx.createGain(); master.gain.value = 0.35; master.connect(ctx.destination);
-      musicGain = ctx.createGain(); musicGain.gain.value = 0.12; musicGain.connect(ctx.destination);
-    }
-    if (ctx.state === 'suspended') ctx.resume();
-    return ctx;
+  let ctx = null, master = null, musicGain = null, enabled = true, musicOn = true, musicTimer = null, step = 0;
+  function init() {
+    if (ctx) return;
+    try {
+      ctx = new (window.AudioContext || window.webkitAudioContext)();
+      master = ctx.createGain(); master.gain.value = 0.5; master.connect(ctx.destination);
+      musicGain = ctx.createGain(); musicGain.gain.value = 0.16; musicGain.connect(master);
+    } catch (e) { ctx = null; }
   }
-
-  function tone(freq, dur, { type = 'square', vol = 0.5, slide = 0, delay = 0, out = null } = {}) {
-    if (!ensure()) return;
-    const t = ctx.currentTime + delay;
-    const o = ctx.createOscillator(), g = ctx.createGain();
-    o.type = type; o.frequency.setValueAtTime(freq, t);
-    if (slide) o.frequency.exponentialRampToValueAtTime(Math.max(30, freq + slide), t + dur);
-    g.gain.setValueAtTime(vol, t);
-    g.gain.exponentialRampToValueAtTime(0.001, t + dur);
-    o.connect(g); g.connect(out || master);
-    o.start(t); o.stop(t + dur + 0.02);
+  function resume() { init(); if (ctx && ctx.state === 'suspended') ctx.resume(); }
+  function tone({ f = 440, f2 = null, t = 0.15, type = 'square', g = 0.3, delay = 0, slide = false, dest = null }) {
+    if (!ctx || !enabled) return;
+    const o = ctx.createOscillator(), a = ctx.createGain();
+    const t0 = ctx.currentTime + delay;
+    o.type = type; o.frequency.setValueAtTime(f, t0);
+    if (f2 != null) o.frequency[slide ? 'linearRampToValueAtTime' : 'exponentialRampToValueAtTime'](Math.max(1, f2), t0 + t);
+    a.gain.setValueAtTime(0.0001, t0);
+    a.gain.exponentialRampToValueAtTime(g, t0 + 0.01);
+    a.gain.exponentialRampToValueAtTime(0.0001, t0 + t);
+    o.connect(a); a.connect(dest || master);
+    o.start(t0); o.stop(t0 + t + 0.02);
   }
-
-  function noise(dur, { vol = 0.5, delay = 0, filter = 1200 } = {}) {
-    if (!ensure()) return;
-    const t = ctx.currentTime + delay;
-    const len = Math.floor(ctx.sampleRate * dur);
-    const buf = ctx.createBuffer(1, len, ctx.sampleRate);
-    const d = buf.getChannelData(0);
-    for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / len);
-    const src = ctx.createBufferSource(); src.buffer = buf;
-    const f = ctx.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = filter;
-    const g = ctx.createGain(); g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.001, t + dur);
-    src.connect(f); f.connect(g); g.connect(master); src.start(t);
+  function noise({ t = 0.3, g = 0.3, delay = 0, hp = 800 }) {
+    if (!ctx || !enabled) return;
+    const n = Math.floor(ctx.sampleRate * t), buf = ctx.createBuffer(1, n, ctx.sampleRate), d = buf.getChannelData(0);
+    for (let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / n);
+    const s = ctx.createBufferSource(); s.buffer = buf;
+    const f = ctx.createBiquadFilter(); f.type = 'highpass'; f.frequency.value = hp;
+    const a = ctx.createGain(); const t0 = ctx.currentTime + delay;
+    a.gain.setValueAtTime(g, t0); a.gain.exponentialRampToValueAtTime(0.0001, t0 + t);
+    s.connect(f); f.connect(a); a.connect(master); s.start(t0);
   }
-
-  const shots = [
-    () => tone(880, 0.06, { vol: 0.12, slide: -300 }),
-    () => tone(300, 0.07, { type: 'sawtooth', vol: 0.12, slide: -120 }),
-    () => tone(1200, 0.05, { type: 'triangle', vol: 0.18, slide: -600 }),
-    () => tone(1500, 0.09, { type: 'sine', vol: 0.15, slide: -1100 }),
-    () => { tone(200, 0.12, { type: 'sawtooth', vol: 0.1, slide: 300 }); },
-    () => { tone(140, 0.1, { type: 'square', vol: 0.12, slide: -60 }); tone(1800, 0.04, { type: 'triangle', vol: 0.08 }); },
-  ];
-
-  const api = {
-    state,
-    unlock() { if (state.sound || state.music) ensure(); if (state.music) startMusic(); },
-    shoot(w) { if (state.sound) shots[w % shots.length](); },
-    hit() { if (state.sound) tone(520, 0.05, { type: 'triangle', vol: 0.15, slide: -200 }); },
-    pop() { if (state.sound) { noise(0.18, { vol: 0.3, filter: 2200 }); tone(260, 0.12, { vol: 0.15, slide: -180 }); } },
-    boom() { if (state.sound) { noise(0.6, { vol: 0.7, filter: 900 }); tone(90, 0.5, { type: 'sawtooth', vol: 0.3, slide: -50 }); } },
-    coin() { if (state.sound) { tone(988, 0.07, { vol: 0.15 }); tone(1319, 0.14, { vol: 0.15, delay: 0.07 }); } },
-    correct() { if (state.sound) [523, 659, 784, 1047].forEach((f, i) => tone(f, 0.16, { type: 'triangle', vol: 0.3, delay: i * 0.07 })); },
-    wrong() { if (state.sound) { tone(330, 0.25, { type: 'sawtooth', vol: 0.25, slide: -150 }); tone(220, 0.35, { type: 'sawtooth', vol: 0.25, slide: -110, delay: 0.18 }); } },
-    hurt() { if (state.sound) noise(0.3, { vol: 0.5, filter: 600 }); },
-    power() { if (state.sound) [392, 523, 659, 784, 1047, 1319].forEach((f, i) => tone(f, 0.12, { type: 'square', vol: 0.16, delay: i * 0.05 })); },
-    charge() { if (state.sound) tone(200, 0.35, { type: 'sawtooth', vol: 0.15, slide: 900 }); },
-    click() { if (state.sound) tone(660, 0.04, { type: 'triangle', vol: 0.15 }); },
-    boss() { if (state.sound) [110, 104, 98, 92].forEach((f, i) => tone(f, 0.3, { type: 'sawtooth', vol: 0.3, delay: i * 0.25 })); },
-    fanfare() {
-      if (!state.sound) return;
-      const seq = [[523, 0], [523, .12], [523, .24], [659, .36], [784, .6], [659, .78], [784, .9], [1047, 1.1]];
-      seq.forEach(([f, d]) => { tone(f, 0.22, { type: 'square', vol: 0.18, delay: d }); tone(f / 2, 0.22, { type: 'triangle', vol: 0.2, delay: d }); });
+  const S = {
+    shoot(tier = 1) {
+      const base = [0, 900, 500, 700, 300, 1400, 200][tier] || 800;
+      if (tier === 5) { tone({ f: 1800, f2: 2400, t: 0.25, type: 'sawtooth', g: 0.15 }); return; }
+      if (tier === 4) { noise({ t: 0.4, g: 0.25, hp: 300 }); tone({ f: 200, f2: 60, t: 0.4, type: 'sawtooth', g: 0.2 }); return; }
+      if (tier === 2) { for (let i = 0; i < 3; i++) tone({ f: base + i * 120, f2: 120, t: 0.12, g: 0.18, delay: i * 0.02 }); return; }
+      tone({ f: base, f2: base / 6, t: 0.14, type: tier === 6 ? 'sawtooth' : 'square', g: 0.22 });
     },
-    setSound(v) { state.sound = v; },
-    setMusic(v) { state.music = v; if (!v) stopMusic(); else if (ctx) startMusic(); },
+    hit() { noise({ t: 0.25, g: 0.35, hp: 400 }); tone({ f: 160, f2: 40, t: 0.25, type: 'sawtooth', g: 0.3 }); },
+    correct(streak = 0) {
+      const notes = [523, 659, 784, 1047];
+      notes.forEach((f, i) => tone({ f, t: 0.14, type: 'square', g: 0.18, delay: i * 0.06 }));
+      if (streak >= 3) tone({ f: 1568, t: 0.3, type: 'triangle', g: 0.2, delay: 0.26 });
+    },
+    wrong() { tone({ f: 220, f2: 110, t: 0.35, type: 'sawtooth', g: 0.25 }); tone({ f: 160, f2: 70, t: 0.4, type: 'square', g: 0.2, delay: 0.1 }); },
+    hurt() { noise({ t: 0.2, g: 0.3, hp: 200 }); tone({ f: 300, f2: 80, t: 0.3, type: 'square', g: 0.25 }); },
+    step() { tone({ f: 90, f2: 60, t: 0.05, type: 'triangle', g: 0.08 }); },
+    coin() { tone({ f: 988, t: 0.08, g: 0.15 }); tone({ f: 1319, t: 0.25, g: 0.15, delay: 0.08 }); },
+    levelup() { [523, 659, 784, 1047, 784, 1047, 1319].forEach((f, i) => tone({ f, t: 0.18, type: i > 3 ? 'triangle' : 'square', g: 0.2, delay: i * 0.09 })); },
+    fanfare() {
+      const m = [[523, 0], [523, .12], [523, .24], [659, .36], [784, .6], [659, .78], [784, 1.0]];
+      m.forEach(([f, d]) => { tone({ f, t: 0.22, type: 'square', g: 0.2, delay: d }); tone({ f: f / 2, t: 0.22, type: 'triangle', g: 0.15, delay: d }); });
+    },
+    boss() { tone({ f: 80, f2: 40, t: 0.8, type: 'sawtooth', g: 0.3 }); noise({ t: 0.6, g: 0.2, hp: 100 }); tone({ f: 110, t: 0.5, type: 'square', g: 0.2, delay: 0.4 }); },
+    powerup() { [440, 554, 659, 880, 1109].forEach((f, i) => tone({ f, t: 0.12, type: 'triangle', g: 0.2, delay: i * 0.05 })); },
+    click() { tone({ f: 600, f2: 900, t: 0.05, type: 'square', g: 0.08 }); },
+    gameover() { [392, 370, 349, 330].forEach((f, i) => tone({ f, t: 0.35, type: 'sawtooth', g: 0.2, delay: i * 0.3 })); }
   };
-
-  // Enkel, rolig chiptune-loop.
-  const bass = [110, 110, 131, 131, 98, 98, 147, 131];
-  const lead = [440, 0, 523, 0, 494, 440, 392, 0, 440, 0, 587, 523, 494, 0, 392, 0];
-  let step = 0;
-  function startMusic() {
-    if (!ensure() || musicTimer) return;
-    musicTimer = setInterval(() => {
-      if (!state.music) return;
-      const b = bass[Math.floor(step / 2) % bass.length];
-      if (step % 2 === 0) tone(b, 0.22, { type: 'triangle', vol: 0.5, out: musicGain });
-      const l = lead[step % lead.length];
-      if (l) tone(l, 0.12, { type: 'square', vol: 0.18, out: musicGain });
-      step++;
-    }, 220);
+  // Enkel musikkloop (bass + melodi) i 8 takter
+  const bass = [131, 131, 165, 165, 196, 196, 147, 147];
+  const mel = [[523, 659, 784, 659], [523, 659, 784, 1047], [659, 784, 988, 784], [587, 698, 880, 698]];
+  function musicTick() {
+    if (!ctx || !enabled || !musicOn) return;
+    const bar = Math.floor(step / 4) % 8, beat = step % 4;
+    tone({ f: bass[bar], t: 0.22, type: 'triangle', g: 0.5, dest: musicGain });
+    if (beat % 2 === 0 || Math.random() < 0.4) tone({ f: mel[bar % 4][beat], t: 0.12, type: 'square', g: 0.22, dest: musicGain });
+    if (beat === 0) noise({ t: 0.05, g: 0.08, hp: 3000 });
+    step++;
   }
-  function stopMusic() { clearInterval(musicTimer); musicTimer = null; }
-  return api;
+  function startMusic() { stopMusic(); if (!ctx || !musicOn) return; musicTimer = setInterval(musicTick, 230); }
+  function stopMusic() { if (musicTimer) clearInterval(musicTimer); musicTimer = null; }
+  return {
+    resume, play(name, ...a) { resume(); if (S[name]) S[name](...a); },
+    setEnabled(v) { enabled = v; if (!v) stopMusic(); else if (musicOn) startMusic(); },
+    setMusic(v) { musicOn = v; if (v) startMusic(); else stopMusic(); },
+    startMusic, stopMusic, get enabled() { return enabled; }
+  };
 })();

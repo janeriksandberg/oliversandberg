@@ -1,21 +1,28 @@
-// Dekrypterer spørsmålsbanken i nettleseren (AES-GCM, nøkkel avledet fra passordet med PBKDF2-SHA256).
+/* Klientside-kryptering: PBKDF2 (SHA-256) -> AES-256-GCM.
+   Spørsmålsdataene ligger kryptert i data/questions.enc.js og dekrypteres i nettleseren. */
 const Vault = (() => {
+  const enc = new TextEncoder();
+  const dec = new TextDecoder();
   const b64 = s => Uint8Array.from(atob(s), c => c.charCodeAt(0));
-  async function open(password) {
-    const res = await fetch('data/questions.enc.json', { cache: 'no-cache' });
-    if (!res.ok) throw new Error('Fant ikke spørsmålsfila');
-    const box = await res.json();
-    const base = await crypto.subtle.importKey('raw', new TextEncoder().encode(password), 'PBKDF2', false, ['deriveKey']);
-    const key = await crypto.subtle.deriveKey(
-      { name: 'PBKDF2', salt: b64(box.salt), iterations: box.iter, hash: 'SHA-256' },
-      base, { name: 'AES-GCM', length: 256 }, false, ['decrypt']);
-    let plain;
-    try {
-      plain = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: b64(box.iv) }, key, b64(box.ct));
-    } catch (e) {
-      const err = new Error('Feil passord'); err.badPassword = true; throw err;
-    }
-    return JSON.parse(new TextDecoder().decode(plain));
+
+  async function deriveKey(password, salt, iterations) {
+    const base = await crypto.subtle.importKey('raw', enc.encode(password.normalize('NFC')), 'PBKDF2', false, ['deriveKey']);
+    return crypto.subtle.deriveKey(
+      { name: 'PBKDF2', salt, iterations, hash: 'SHA-256' },
+      base, { name: 'AES-GCM', length: 256 }, false, ['decrypt']
+    );
   }
-  return { open };
+
+  async function unlock(password, blob) {
+    if (!blob || !blob.ct) throw new Error('Mangler data');
+    if (!crypto.subtle) throw new Error('Nettleseren mangler Web Crypto (krever https eller localhost).');
+    const key = await deriveKey(password, b64(blob.salt), blob.iterations || 200000);
+    try {
+      const plain = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: b64(blob.iv) }, key, b64(blob.ct));
+      return JSON.parse(dec.decode(plain));
+    } catch (e) {
+      throw new Error('Feil passord');
+    }
+  }
+  return { unlock };
 })();
