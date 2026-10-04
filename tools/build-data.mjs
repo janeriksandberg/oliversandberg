@@ -20,11 +20,11 @@ for (const c of chapters) for (const [i, q] of c.questions.entries()) {
 const plain = JSON.stringify({ built: new Date().toISOString(), chapters });
 
 const enc = new TextEncoder();
-const salt = crypto.getRandomValues(new Uint8Array(16)), iv = crypto.getRandomValues(new Uint8Array(12)), iterations = 200000;
+const salt = crypto.getRandomValues(new Uint8Array(16)), iv = crypto.getRandomValues(new Uint8Array(12)), iterations = 600000;
 const base = await crypto.subtle.importKey('raw', enc.encode(password.normalize('NFC')), 'PBKDF2', false, ['deriveKey']);
 const key = await crypto.subtle.deriveKey({ name: 'PBKDF2', salt, iterations, hash: 'SHA-256' }, base, { name: 'AES-GCM', length: 256 }, false, ['encrypt']);
 const ct = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, enc.encode(plain)));
 const b64 = u => Buffer.from(u).toString('base64');
 const blob = { v: 1, kdf: 'PBKDF2-SHA256', iterations, cipher: 'AES-256-GCM', salt: b64(salt), iv: b64(iv), ct: b64(ct) };
-writeFileSync(path.join(root, 'data', 'questions.enc.js'), `// Generert av tools/build-data.mjs ${new Date().toISOString()}. ${chapters.length} kapitler, ${chapters.reduce((s, c) => s + c.questions.length, 0)} spørsmål. Kryptert.\nwindow.ENC_DATA = ${JSON.stringify(blob)};\n`);
+writeFileSync(path.join(root, 'data', 'questions.enc.js'), `// Generert av tools/build-data.mjs. Kryptert innhold.\nwindow.ENC_DATA = ${JSON.stringify(blob)};\n`);
 console.log(`OK: ${chapters.length} kapitler, ${chapters.reduce((s, c) => s + c.questions.length, 0)} spørsmål, ${(ct.length / 1024).toFixed(0)} kB kryptert -> data/questions.enc.js`);
